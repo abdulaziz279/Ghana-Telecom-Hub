@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ghana Telecom Airtime & Data Portal</title>
+    <meta name="description" content="Production-ready telecom airtime and data bundle recharge platform for MTN, Telecel, and AirtelTigo with Paystack payments, Hubtel dispatch, sub-agent commissions, and SOC2/GDPR audit compliance." />
+    <meta property="og:title" content="Ghana Telecom Airtime & Data Portal" />
+    <meta property="og:description" content="Production-ready telecom airtime and data bundle recharge platform for MTN, Telecel, and AirtelTigo with Paystack payments, Hubtel dispatch, sub-agent commissions, and SOC2/GDPR audit compliance." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // Gracefully prevent unhandled WebSocket error messages from dev proxy
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event && event.reason && (
+          String(event.reason).includes('WebSocket') ||
+          (event.reason.message && event.reason.message.includes('WebSocket'))
+        )) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        if (event && event.message && event.message.includes('WebSocket')) {
+          event.preventDefault();
+        }
+      });
+    </script>
+    <script src="https://js.paystack.co/v1/inline.js"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 antialiased font-['Plus_Jakarta_Sans',sans-serif]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

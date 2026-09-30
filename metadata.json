@@ -1,0 +1,6 @@
+{
+  "name": "Ghana Telecom Airtime & Data Portal",
+  "description": "Production-ready telecom airtime and data bundle recharge platform for MTN, Telecel, and AirtelTigo with Paystack payments, Hubtel dispatch, sub-agent commissions, and SOC2/GDPR audit compliance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

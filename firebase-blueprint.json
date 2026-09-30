@@ -1,0 +1,156 @@
+{
+  "entities": {
+    "transactions": {
+      "title": "Transaction",
+      "description": "Real-time records of airtime and data bundle purchases and dispatch records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reference": { "type": "string" },
+        "recipientPhone": { "type": "string" },
+        "network": { "type": "string", "enum": ["MTN", "TELECEL", "AIRTELTIGO"] },
+        "serviceType": { "type": "string", "enum": ["AIRTIME", "DATA"] },
+        "packageId": { "type": "string" },
+        "packageName": { "type": "string" },
+        "amountGHS": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string", "enum": ["success", "pending", "failed"] },
+        "dispatchStatus": { "type": "string", "enum": ["delivered", "dispatched", "pending", "failed"] },
+        "hubtelTransactionId": { "type": "string" },
+        "deliveryReceipt": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "agentCode": { "type": "string" },
+        "agentId": { "type": "string" },
+        "commissionEarnedGHS": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "completedAt": { "type": "string" }
+      },
+      "required": ["id", "reference", "recipientPhone", "network", "amountGHS", "paymentStatus", "createdAt"]
+    },
+    "orders": {
+      "title": "Order",
+      "description": "Production telecom orders and instant carrier fulfillment dispatches (Admin protected)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "recipientPhone": { "type": "string" },
+        "network": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "packageName": { "type": "string" },
+        "amountGHS": { "type": "number" },
+        "status": { "type": "string" },
+        "carrierDispatchStatus": { "type": "string" },
+        "carrierReference": { "type": "string" },
+        "hubtelBatchId": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "recipientPhone", "amountGHS", "status", "createdAt"]
+    },
+    "agents": {
+      "title": "Sub-Agent",
+      "description": "Provisioned sub-agent profiles, referral codes, float balances, and commission rates (Admin protected)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "agentCode": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "commissionRate": { "type": "number" },
+        "balanceGHS": { "type": "number" },
+        "commissionEarnedGHS": { "type": "number" },
+        "totalSalesVolumeGHS": { "type": "number" },
+        "status": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "agentCode", "fullName", "phone", "email", "commissionRate"]
+    },
+    "payouts": {
+      "title": "Commission Payout",
+      "description": "Sub-agent commission withdrawal requests and disbursement logs (Admin approved)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "agentId": { "type": "string" },
+        "agentName": { "type": "string" },
+        "agentPhone": { "type": "string" },
+        "amountGHS": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "status": { "type": "string" },
+        "requestedAt": { "type": "string" },
+        "processedAt": { "type": "string" }
+      },
+      "required": ["id", "agentId", "amountGHS", "status", "requestedAt"]
+    },
+    "auditLogs": {
+      "title": "Audit Log",
+      "description": "Immutable regulatory audit trail entries with SHA-256 integrity verification (Admin strictly protected)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "actorId": { "type": "string" },
+        "actorEmail": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "action": { "type": "string" },
+        "target": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "status": { "type": "string" },
+        "severity": { "type": "string" },
+        "tamperHash": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "action", "status", "tamperHash"]
+    },
+    "settings": {
+      "title": "System Settings",
+      "description": "Platform gateway and regulatory operational parameters (Admin strictly protected)",
+      "type": "object",
+      "properties": {
+        "isPaystackLive": { "type": "boolean" },
+        "isHubtelLive": { "type": "boolean" },
+        "paystackPublicKey": { "type": "string" },
+        "hubtelClientId": { "type": "string" },
+        "hubtelMerchantAccount": { "type": "string" },
+        "crmWebhookUrl": { "type": "string" },
+        "defaultCommissionRate": { "type": "number" },
+        "twoFactorMandatory": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/transactions/{transactionId}": {
+      "schema": "transactions",
+      "description": "Real-time records of airtime and data bundle purchases and dispatch records"
+    },
+    "/orders/{orderId}": {
+      "schema": "orders",
+      "description": "Production telecom orders and instant carrier fulfillment dispatches (Admin protected)"
+    },
+    "/agents/{agentId}": {
+      "schema": "agents",
+      "description": "Provisioned sub-agent profiles, referral codes, and commission rates (Admin protected)"
+    },
+    "/payouts/{payoutId}": {
+      "schema": "payouts",
+      "description": "Sub-agent commission withdrawal requests and disbursement logs"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "auditLogs",
+      "description": "Immutable regulatory audit trail entries with SHA-256 integrity verification (Admin protected)"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Platform gateway parameters and carrier credentials (Admin strictly protected)"
+    }
+  }
+}

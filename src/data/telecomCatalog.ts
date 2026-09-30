@@ -1,0 +1,310 @@
+import { TelecomPackage, CurrencyRate, NetworkOperator } from '../types';
+
+export const GHANA_CURRENCIES: Record<string, CurrencyRate> = {
+  GHS: { code: 'GHS', symbol: 'GH₵', rateToGHS: 1.0, name: 'Ghanaian Cedi' },
+  USD: { code: 'USD', symbol: '$', rateToGHS: 15.65, name: 'US Dollar' },
+  EUR: { code: 'EUR', symbol: '€', rateToGHS: 17.10, name: 'Euro' },
+  GBP: { code: 'GBP', symbol: '£', rateToGHS: 20.45, name: 'British Pound' },
+  NGN: { code: 'NGN', symbol: '₦', rateToGHS: 0.0102, name: 'Nigerian Naira' },
+};
+
+export const TELECOM_PACKAGES: TelecomPackage[] = [
+  // --- MTN GHANA AIRTIME ---
+  {
+    id: 'mtn-airtime-flexi',
+    network: 'MTN',
+    type: 'AIRTIME',
+    name: 'MTN Ghana Flexi Airtime',
+    validity: 'Lifetime / No Expiry',
+    priceGHS: 10,
+    description: 'Instant recharge to any MTN Ghana prepaid number with 100% bonus credit on promo days.',
+  },
+
+  // --- MTN GHANA DATA BUNDLES ---
+  {
+    id: 'mtn-data-1gb',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Daily Flexi',
+    dataVolume: '1.0 GB',
+    validity: '24 Hours',
+    priceGHS: 5.0,
+    popular: true,
+    description: '1GB high-speed 4G/5G data valid for 24 hours.',
+    bundleCode: 'MTN_DATA_1GB_D',
+  },
+  {
+    id: 'mtn-data-2.5gb',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN 3-Day Bundle',
+    dataVolume: '2.5 GB',
+    validity: '3 Days',
+    priceGHS: 12.0,
+    popular: true,
+    description: '2.5GB high-speed 4G/5G data for streaming and downloads.',
+    bundleCode: 'MTN_DATA_2.5GB_3D',
+  },
+  {
+    id: 'mtn-data-5gb-weekly',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Weekly Pro',
+    dataVolume: '5.0 GB',
+    validity: '7 Days',
+    priceGHS: 25.0,
+    popular: true,
+    description: '5GB 4G+ data for web browsing, streaming, and hotspot.',
+    bundleCode: 'MTN_DATA_5GB_7D',
+  },
+  {
+    id: 'mtn-data-10gb-monthly',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Monthly Comfort',
+    dataVolume: '10.0 GB',
+    validity: '30 Days',
+    priceGHS: 45.0,
+    popular: true,
+    description: '10GB monthly standard allowance with rollover on renewal.',
+    bundleCode: 'MTN_DATA_10GB_30D',
+  },
+  {
+    id: 'mtn-data-25gb-monthly',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Executive Monthly',
+    dataVolume: '25.0 GB',
+    validity: '30 Days',
+    priceGHS: 100.0,
+    popular: false,
+    description: '25GB heavy-usage monthly allowance for business and remote work.',
+    bundleCode: 'MTN_DATA_25GB_30D',
+  },
+  {
+    id: 'mtn-data-50gb-monthly',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Ultra Monthly',
+    dataVolume: '50.0 GB',
+    validity: '30 Days',
+    priceGHS: 195.0,
+    popular: false,
+    description: '50GB ultra-fast bundle for power users and smart homes.',
+    bundleCode: 'MTN_DATA_50GB_30D',
+  },
+  {
+    id: 'mtn-data-midnight',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Midnight Special',
+    dataVolume: '5.0 GB',
+    validity: '12 AM – 5 AM',
+    priceGHS: 6.0,
+    popular: false,
+    description: '5GB high-speed data strictly between 12:00 midnight and 5:00 AM.',
+    bundleCode: 'MTN_DATA_MIDNIGHT_5GB',
+  },
+  {
+    id: 'mtn-data-turbonet-100gb',
+    network: 'MTN',
+    type: 'DATA',
+    name: 'MTN Turbonet Broadband',
+    dataVolume: '100.0 GB',
+    validity: '30 Days',
+    priceGHS: 350.0,
+    popular: false,
+    description: 'Dedicated high-capacity router and Turbonet SIM bundle.',
+    bundleCode: 'MTN_DATA_TURBONET_100GB',
+  },
+
+  // --- TELECEL GHANA (VODAFONE) AIRTIME ---
+  {
+    id: 'telecel-airtime-flexi',
+    network: 'Telecel',
+    type: 'AIRTIME',
+    name: 'Telecel Ghana Flexi Airtime',
+    validity: 'Lifetime / No Expiry',
+    priceGHS: 10,
+    description: 'Instant airtime credit for all Telecel voice calls, SMS, and roaming.',
+  },
+
+  // --- TELECEL GHANA DATA BUNDLES ---
+  {
+    id: 'telecel-bossu-daily',
+    network: 'Telecel',
+    type: 'DATA',
+    name: 'Telecel Bossu Daily',
+    dataVolume: '1.2 GB',
+    validity: '24 Hours',
+    priceGHS: 5.0,
+    popular: true,
+    description: '1.2GB high-speed 4G data valid for 24 hours.',
+    bundleCode: 'TC_BOSSU_1.2GB',
+  },
+  {
+    id: 'telecel-bossu-3days',
+    network: 'Telecel',
+    type: 'DATA',
+    name: 'Telecel Bossu Weekend/3-Day',
+    dataVolume: '3.5 GB',
+    validity: '3 Days',
+    priceGHS: 15.0,
+    popular: true,
+    description: '3.5GB 4G data plus bonus minutes to Telecel numbers.',
+    bundleCode: 'TC_BOSSU_3.5GB',
+  },
+  {
+    id: 'telecel-red-weekly',
+    network: 'Telecel',
+    type: 'DATA',
+    name: 'Telecel Red Weekly',
+    dataVolume: '7.0 GB',
+    validity: '7 Days',
+    priceGHS: 30.0,
+    popular: true,
+    description: '7GB data allowance for weekly connectivity without speed drops.',
+    bundleCode: 'TC_RED_7GB',
+  },
+  {
+    id: 'telecel-red-monthly-15gb',
+    network: 'Telecel',
+    type: 'DATA',
+    name: 'Telecel Red Monthly Lite',
+    dataVolume: '15.0 GB',
+    validity: '30 Days',
+    priceGHS: 65.0,
+    popular: false,
+    description: '15GB standard monthly package for daily surfing & social media.',
+    bundleCode: 'TC_RED_15GB',
+  },
+  {
+    id: 'telecel-red-monthly-40gb',
+    network: 'Telecel',
+    type: 'DATA',
+    name: 'Telecel Red Pro Monthly',
+    dataVolume: '40.0 GB',
+    validity: '30 Days',
+    priceGHS: 145.0,
+    popular: true,
+    description: '40GB high-speed bundle with rollover on subsequent subscription.',
+    bundleCode: 'TC_RED_40GB',
+  },
+  {
+    id: 'telecel-red-monthly-90gb',
+    network: 'Telecel',
+    type: 'DATA',
+    name: 'Telecel Red Supreme',
+    dataVolume: '90.0 GB',
+    validity: '30 Days',
+    priceGHS: 280.0,
+    popular: false,
+    description: '90GB business package with priority 4G LTE network allocation.',
+    bundleCode: 'TC_RED_90GB',
+  },
+
+  // --- AIRTELTIGO (AT) AIRTIME ---
+  {
+    id: 'at-airtime-flexi',
+    network: 'AirtelTigo',
+    type: 'AIRTIME',
+    name: 'AT Ghana Flexi Airtime',
+    validity: 'Lifetime / No Expiry',
+    priceGHS: 10,
+    description: 'Instant recharge for AT (AirtelTigo) numbers across all regions.',
+  },
+
+  // --- AIRTELTIGO (AT) DATA BUNDLES (BIG TIME - NO EXPIRY) ---
+  {
+    id: 'at-bigtime-1.5gb',
+    network: 'AirtelTigo',
+    type: 'DATA',
+    name: 'AT Big Time Mini',
+    dataVolume: '1.5 GB',
+    validity: 'NO EXPIRY',
+    priceGHS: 6.0,
+    popular: true,
+    description: '1.5GB legendary Big Time data that never expires until depleted.',
+    bundleCode: 'AT_BIGTIME_1.5GB',
+  },
+  {
+    id: 'at-bigtime-4gb',
+    network: 'AirtelTigo',
+    type: 'DATA',
+    name: 'AT Big Time Regular',
+    dataVolume: '4.0 GB',
+    validity: 'NO EXPIRY',
+    priceGHS: 15.0,
+    popular: true,
+    description: '4GB reliable data with zero expiry date. Use anytime.',
+    bundleCode: 'AT_BIGTIME_4GB',
+  },
+  {
+    id: 'at-bigtime-10gb',
+    network: 'AirtelTigo',
+    type: 'DATA',
+    name: 'AT Big Time Value',
+    dataVolume: '10.0 GB',
+    validity: 'NO EXPIRY',
+    priceGHS: 35.0,
+    popular: true,
+    description: '10GB high-speed data with no time expiration.',
+    bundleCode: 'AT_BIGTIME_10GB',
+  },
+  {
+    id: 'at-bigtime-30gb',
+    network: 'AirtelTigo',
+    type: 'DATA',
+    name: 'AT Big Time Max',
+    dataVolume: '30.0 GB',
+    validity: 'NO EXPIRY',
+    priceGHS: 90.0,
+    popular: false,
+    description: '30GB heavy-duty bundle that stays on your SIM until completely exhausted.',
+    bundleCode: 'AT_BIGTIME_30GB',
+  },
+  {
+    id: 'at-bigtime-75gb',
+    network: 'AirtelTigo',
+    type: 'DATA',
+    name: 'AT Big Time Mega',
+    dataVolume: '75.0 GB',
+    validity: 'NO EXPIRY',
+    priceGHS: 190.0,
+    popular: false,
+    description: '75GB ultimate data package for family and business hotspots.',
+    bundleCode: 'AT_BIGTIME_75GB',
+  },
+  {
+    id: 'at-fuse-combo',
+    network: 'AirtelTigo',
+    type: 'DATA',
+    name: 'AT Fuse Combo Plus',
+    dataVolume: '5.0 GB + 120 Mins',
+    validity: '30 Days',
+    priceGHS: 30.0,
+    popular: false,
+    description: '5GB data plus 120 all-network voice minutes to any network in Ghana.',
+    bundleCode: 'AT_FUSE_COMBO',
+  },
+];
+
+export function detectNetworkFromPhone(phone: string): NetworkOperator | null {
+  // Ghana phone prefix detection:
+  // MTN: 024, 054, 055, 059, 025, 053
+  // Telecel (Vodafone): 020, 050
+  // AirtelTigo: 027, 057, 026, 056
+  const clean = phone.replace(/\D/g, '');
+  const prefix = clean.startsWith('233') ? '0' + clean.slice(3, 5) : clean.slice(0, 3);
+
+  if (['024', '054', '055', '059', '025', '053'].includes(prefix)) {
+    return 'MTN';
+  }
+  if (['020', '050'].includes(prefix)) {
+    return 'Telecel';
+  }
+  if (['027', '057', '026', '056'].includes(prefix)) {
+    return 'AirtelTigo';
+  }
+  return null;
+}
