@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Wallet,
@@ -12,7 +12,19 @@ import {
   ShieldCheck,
   Send,
   Loader2,
+  BarChart3,
+  Calendar,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts';
 import { UserAccount, Transaction, CommissionPayout, CurrencyCode } from '../types';
 import { GHANA_CURRENCIES } from '../data/telecomCatalog';
 
@@ -141,6 +153,104 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
   const totalSalesVolume = agentTransactions
     .filter((t) => t.paymentStatus === 'success')
     .reduce((sum, t) => sum + t.amountGHS, 0);
+
+  const [chartMetric, setChartMetric] = useState<'ALL' | 'COMMISSION' | 'VOLUME'>('ALL');
+
+  // Generate 30-day timeline data for Recharts Bar Chart
+  const chartData = useMemo(() => {
+    const days: {
+      dateKey: string;
+      label: string;
+      fullDate: string;
+      commission: number;
+      volume: number;
+      count: number;
+    }[] = [];
+
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const fullDate = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      days.push({
+        dateKey,
+        label,
+        fullDate,
+        commission: 0,
+        volume: 0,
+        count: 0,
+      });
+    }
+
+    const dayMap = new Map<string, typeof days[0]>();
+    days.forEach((day) => dayMap.set(day.dateKey, day));
+
+    agentTransactions.forEach((tx) => {
+      if (tx.paymentStatus === 'success') {
+        const txDate = tx.createdAt ? tx.createdAt.split('T')[0] : '';
+        const entry = dayMap.get(txDate);
+        if (entry) {
+          const comm =
+            typeof tx.commissionEarnedGHS === 'number' && !isNaN(tx.commissionEarnedGHS)
+              ? tx.commissionEarnedGHS
+              : (Number(tx.amountGHS) * effectiveCommissionRate) / 100;
+          entry.commission = Number((entry.commission + comm).toFixed(2));
+          entry.volume = Number((entry.volume + Number(tx.amountGHS)).toFixed(2));
+          entry.count += 1;
+        }
+      }
+    });
+
+    return days;
+  }, [agentTransactions, effectiveCommissionRate]);
+
+  const thirtyDaySummary = useMemo(() => {
+    const totalCommission = chartData.reduce((acc, d) => acc + d.commission, 0);
+    const totalVolume = chartData.reduce((acc, d) => acc + d.volume, 0);
+    const totalTxCount = chartData.reduce((acc, d) => acc + d.count, 0);
+    const activeDays = chartData.filter((d) => d.count > 0).length;
+    return {
+      totalCommission: Number(totalCommission.toFixed(2)),
+      totalVolume: Number(totalVolume.toFixed(2)),
+      totalTxCount,
+      activeDays,
+    };
+  }, [chartData]);
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-900/95 backdrop-blur-md border border-slate-700 p-3.5 rounded-xl shadow-2xl text-xs text-white min-w-[210px]">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
+            <span className="font-bold text-slate-200">{data.fullDate}</span>
+            <span className="text-[10px] bg-slate-800 text-amber-300 font-semibold px-2 py-0.5 rounded-md font-mono">
+              {data.count} {data.count === 1 ? 'transaction' : 'transactions'}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-4">
+              <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                Commission:
+              </span>
+              <span className="font-bold font-mono text-emerald-300">GH₵{data.commission.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="flex items-center gap-1.5 text-blue-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block"></span>
+                Sales Volume:
+              </span>
+              <span className="font-bold font-mono text-blue-300">GH₵{data.volume.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   if (!isRealAgent) {
     return (
@@ -333,6 +443,168 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
           <div className="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
             Instant Hubtel API Dispatches
           </div>
+        </div>
+      </div>
+
+      {/* 30-Day Performance & Commission Analytics (Recharts Bar Chart) */}
+      <div
+        id="agent-30day-analytics-chart"
+        className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 shadow-sm transition-colors space-y-6"
+      >
+        {/* Chart Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-500 dark:text-amber-400 flex items-center justify-center border border-amber-400/30 shrink-0">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-['Outfit',sans-serif]">
+                  30-Day Commission & Volume Analytics
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Last 30 Days
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Visualizing daily commission earnings and customer transaction volumes
+              </p>
+            </div>
+          </div>
+
+          {/* Metric Mode Filter Buttons */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl self-start sm:self-auto text-xs font-semibold border border-slate-200/80 dark:border-slate-700/80">
+            <button
+              type="button"
+              id="chart-filter-all"
+              onClick={() => setChartMetric('ALL')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                chartMetric === 'ALL'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Dual Comparison
+            </button>
+            <button
+              type="button"
+              id="chart-filter-commission"
+              onClick={() => setChartMetric('COMMISSION')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                chartMetric === 'COMMISSION'
+                  ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Commission Earnings
+            </button>
+            <button
+              type="button"
+              id="chart-filter-volume"
+              onClick={() => setChartMetric('VOLUME')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                chartMetric === 'VOLUME'
+                  ? 'bg-blue-600 text-white shadow-sm font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Sales Volume
+            </button>
+          </div>
+        </div>
+
+        {/* 30-Day Aggregated Highlights */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-950/60 rounded-2xl p-4 border border-slate-200/70 dark:border-slate-800/80">
+          <div>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+              30-Day Total Commission
+            </span>
+            <span className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5 block">
+              GH₵{thirtyDaySummary.totalCommission.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-slate-400">At {effectiveCommissionRate}% base rate</span>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+              30-Day Total Volume
+            </span>
+            <span className="text-lg sm:text-xl font-black text-blue-600 dark:text-blue-400 font-mono mt-0.5 block">
+              GH₵{thirtyDaySummary.totalVolume.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-slate-400">Airtime & data gross</span>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+              Orders Processed
+            </span>
+            <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono mt-0.5 block">
+              {thirtyDaySummary.totalTxCount}
+            </span>
+            <span className="text-[10px] text-slate-400">Successful checkouts</span>
+          </div>
+          <div>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+              Active Selling Days
+            </span>
+            <span className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400 font-mono mt-0.5 block">
+              {thirtyDaySummary.activeDays} <span className="text-xs text-slate-400 font-normal">/ 30</span>
+            </span>
+            <span className="text-[10px] text-slate-400">Days with activity</span>
+          </div>
+        </div>
+
+        {/* Recharts Bar Chart */}
+        <div className="w-full h-80 pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 12, right: 15, left: -5, bottom: 25 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
+              <XAxis
+                dataKey="label"
+                stroke="#94a3b8"
+                fontSize={11}
+                tickLine={false}
+                interval={2}
+                angle={-35}
+                textAnchor="end"
+                height={42}
+              />
+              <YAxis
+                stroke="#94a3b8"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => `GH₵${v}`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                iconType="circle"
+                wrapperStyle={{ paddingBottom: '12px', fontSize: '12px' }}
+              />
+              {(chartMetric === 'ALL' || chartMetric === 'COMMISSION') && (
+                <Bar
+                  dataKey="commission"
+                  name="Commission Earned (GH₵)"
+                  fill="#10b981"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={chartMetric === 'ALL' ? 18 : 34}
+                />
+              )}
+              {(chartMetric === 'ALL' || chartMetric === 'VOLUME') && (
+                <Bar
+                  dataKey="volume"
+                  name="Sales Volume (GH₵)"
+                  fill="#3b82f6"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={chartMetric === 'ALL' ? 18 : 34}
+                />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
