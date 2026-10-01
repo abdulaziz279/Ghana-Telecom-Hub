@@ -253,7 +253,7 @@ export default function App() {
               className={`px-3.5 py-1.5 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md shadow-red-950/50 border border-red-500/60 flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
                 !currentUser ? 'animate-pulse hover:animate-none ring-2 ring-red-500/50 shadow-red-600/40' : ''
               }`}
-              title="Administrator & Developer Login with default credentials"
+              title="Administrator & Developer Portal Login"
             >
               {!currentUser && (
                 <span className="relative flex h-1.5 w-1.5">

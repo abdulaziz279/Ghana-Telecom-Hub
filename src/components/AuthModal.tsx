@@ -25,44 +25,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
 
-  // Active default administrator credentials (can be updated on admin dashboard)
-  const [adminDefaults, setAdminDefaults] = useState<{ email: string; password: string }>({
-    email: 'juniorazigiza@gmail.com',
-    password: 'Admin2026Secure!',
-  });
-
   // 2FA Challenge state
   const [challengeToken, setChallengeToken] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [maskedPhone, setMaskedPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch active admin defaults whenever modal opens
+  // Reset or switch to login mode when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetch('/api/auth/admin-defaults')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.email) {
-            const defaults = {
-              email: data.email,
-              password: data.password || 'Admin2026Secure!',
-            };
-            setAdminDefaults(defaults);
-            if (initialRole === 'ADMIN') {
-              setEmail(defaults.email);
-              setPassword(defaults.password);
-              setMode('LOGIN');
-            }
-          }
-        })
-        .catch(() => {
-          if (initialRole === 'ADMIN') {
-            setEmail('juniorazigiza@gmail.com');
-            setPassword('Admin2026Secure!');
-            setMode('LOGIN');
-          }
-        });
+      if (initialRole === 'ADMIN') {
+        setMode('LOGIN');
+      }
     }
   }, [isOpen, initialRole]);
 
@@ -256,46 +230,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* FORM: LOGIN */}
           {mode === 'LOGIN' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {/* Default Administrator Credentials Info & Auto-Fill */}
-              <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-3.5 space-y-2.5 text-white">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5 text-red-400" />
-                      Administrator / Developer Login
-                    </span>
+              {initialRole === 'ADMIN' && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-2.5 text-xs text-slate-200">
+                  <div className="w-7 h-7 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                    <KeyRound className="w-3.5 h-3.5" />
                   </div>
-                  <button
-                    type="button"
-                    id="auto-fill-admin-creds-btn"
-                    onClick={() => {
-                      setEmail(adminDefaults.email);
-                      setPassword(adminDefaults.password);
-                      onShowToast('info', 'Credentials Loaded', 'Default administrator email and password populated.');
-                    }}
-                    className="px-2.5 py-1 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer shrink-0 shadow-sm"
-                    title="Click to fill default admin login details"
-                  >
-                    Load Default Admin
-                  </button>
-                </div>
-
-                <div className="bg-slate-950/70 rounded-xl p-2.5 border border-slate-800 text-[11px] space-y-1.5 font-mono">
-                  <div className="flex justify-between items-center text-slate-300">
-                    <span className="text-slate-400">Default Email:</span>
-                    <span className="font-bold text-amber-300">{adminDefaults.email}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-300">
-                    <span className="text-slate-400">Default Password:</span>
-                    <span className="font-bold text-amber-300">{adminDefaults.password}</span>
+                  <div>
+                    <p className="font-bold text-white">Administrator Access</p>
+                    <p className="text-[11px] text-slate-400">Sign in with your authorized administrator credentials.</p>
                   </div>
                 </div>
-
-                <p className="text-[10.5px] text-slate-400 leading-normal">
-                  <strong className="text-slate-300">Note:</strong> Administrator email and password can be customized at any time on the Admin Dashboard under <strong>Profile & Credentials</strong>.
-                </p>
-              </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -309,7 +254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@ghanatelecom.com.gh"
+                    placeholder="Enter your account email"
                     className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 text-slate-900 dark:text-white"
                   />
                 </div>

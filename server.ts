@@ -323,7 +323,7 @@ app.post('/api/auth/verify-2fa', (req, res) => {
   });
 });
 
-// Endpoint to retrieve active administrator default credentials (which can be changed on the admin dashboard)
+// Endpoint to check administrator system provisioning status (passwords strictly withheld)
 app.get('/api/auth/admin-defaults', (req, res) => {
   const db = loadDatabase();
   const adminUser = db.users.find((u) => u.role === 'ADMIN' && u.email.toLowerCase() === 'juniorazigiza@gmail.com') ||
@@ -331,21 +331,13 @@ app.get('/api/auth/admin-defaults', (req, res) => {
 
   if (adminUser) {
     res.json({
-      email: adminUser.email,
-      password: adminUser.password || 'Admin2026Secure!',
-      fullName: adminUser.fullName,
+      configured: true,
       role: 'ADMIN',
-      phone: adminUser.phone,
-      note: 'Configurable on Administrator Dashboard under Profile & Credentials',
     });
   } else {
     res.json({
-      email: 'juniorazigiza@gmail.com',
-      password: 'Admin2026Secure!',
-      fullName: 'Abdul Razak Sugri A Aziz',
+      configured: true,
       role: 'ADMIN',
-      phone: '0247946116',
-      note: 'Configurable on Administrator Dashboard under Profile & Credentials',
     });
   }
 });
