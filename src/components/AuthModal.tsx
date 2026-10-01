@@ -31,6 +31,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [maskedPhone, setMaskedPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Safe response parser that catches HTML 404/500 errors and avoids "Unexpected token 'T'"
+  const parseApiResponse = async (res: Response): Promise<any> => {
+    const text = await res.text();
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('Backend API endpoint not found (404). Please verify Vercel serverless routing.');
+        }
+        throw new Error(`Server returned HTTP ${res.status}: ${text.slice(0, 100) || res.statusText}`);
+      }
+      throw new Error('Unexpected non-JSON response received from server.');
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.error || `Request failed with HTTP status ${res.status}`);
+    }
+    return data;
+  };
+
   // Reset or switch to login mode when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -57,10 +79,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
+      const data = await parseApiResponse(res);
 
       if (data.requires2FA) {
         setChallengeToken(data.challengeToken);
@@ -100,10 +119,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || '2FA verification rejected.');
-      }
+      const data = await parseApiResponse(res);
 
       onShowToast(
         'success',
@@ -140,10 +156,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Registration failed');
-      }
+      await parseApiResponse(res);
 
       onShowToast('success', 'Account Registered', 'Please sign in to complete initial 2FA verification.');
       setEmail(email);

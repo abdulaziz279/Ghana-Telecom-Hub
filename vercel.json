@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/buy/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/s/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/ref/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

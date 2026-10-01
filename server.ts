@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
-import { createServer as createViteServer } from 'vite';
 import {
   loadDatabase,
   saveDatabase,
@@ -2091,6 +2090,7 @@ app.get(['/buy/:code', '/s/:code', '/ref/:code'], (req, res) => {
 // -------------------------------------------------------------
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -2113,4 +2113,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only launch standalone web server when not running in Vercel serverless runtime
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

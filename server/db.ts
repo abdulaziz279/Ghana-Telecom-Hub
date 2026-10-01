@@ -11,8 +11,10 @@ import {
   AnalyticsSummary,
 } from '../src/types';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? '/tmp/data' : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'database.json');
+const SEED_FILE = path.resolve(process.cwd(), 'data/database.json');
 
 // Master encryption key for data encryption at rest (SOC2 / GDPR compliance)
 const MASTER_KEY = process.env.ENCRYPTION_MASTER_KEY || 'ghana_telecom_secure_master_aes256_k';
@@ -115,8 +117,13 @@ export function loadDatabase(): AppDatabase {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
 
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+    let sourceFile = DB_FILE;
+    if (!fs.existsSync(DB_FILE) && isVercel && fs.existsSync(SEED_FILE)) {
+      sourceFile = SEED_FILE;
+    }
+
+    if (fs.existsSync(sourceFile)) {
+      const raw = fs.readFileSync(sourceFile, 'utf-8');
       cachedDb = JSON.parse(raw);
       // Cleanse any legacy test/demo users or transactions if present
       if (cachedDb && Array.isArray(cachedDb.users)) {
