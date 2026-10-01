@@ -2075,6 +2075,18 @@ app.post('/api/crm/test-webhook', requireAdmin, async (req, res) => {
 });
 
 // -------------------------------------------------------------
+// SUB-AGENT SHORT-LINK REDIRECTS (/buy/:code, /s/:code, /ref/:code)
+// -------------------------------------------------------------
+app.get(['/buy/:code', '/s/:code', '/ref/:code'], (req, res) => {
+  const code = encodeURIComponent(req.params.code || '');
+  const queryParts: string[] = [`agent=${code}`];
+  if (req.query.net) queryParts.push(`net=${encodeURIComponent(String(req.query.net))}`);
+  if (req.query.pkg) queryParts.push(`pkg=${encodeURIComponent(String(req.query.pkg))}`);
+  if (req.query.type) queryParts.push(`type=${encodeURIComponent(String(req.query.type))}`);
+  res.redirect(`/?${queryParts.join('&')}`);
+});
+
+// -------------------------------------------------------------
 // VITE MIDDLEWARE & SPA SERVING
 // -------------------------------------------------------------
 async function startServer() {

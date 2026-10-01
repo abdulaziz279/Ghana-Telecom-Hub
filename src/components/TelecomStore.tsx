@@ -49,6 +49,58 @@ export const TelecomStore: React.FC<TelecomStoreProps> = ({
 
   const curr = GHANA_CURRENCIES[selectedCurrency] || GHANA_CURRENCIES.GHS;
 
+  // Read agent referral links and pre-selected parameters from URL or sessionStorage
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      let detectedAgent =
+        searchParams.get('agent') ||
+        searchParams.get('ref') ||
+        searchParams.get('code');
+
+      // Check pathname for /buy/:code or /s/:code
+      if (!detectedAgent && window.location.pathname) {
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        if (pathParts.length >= 2 && (pathParts[0] === 'buy' || pathParts[0] === 's' || pathParts[0] === 'ref')) {
+          detectedAgent = pathParts[1];
+        }
+      }
+
+      if (!detectedAgent) {
+        detectedAgent = sessionStorage.getItem('referredByAgent') || '';
+      }
+
+      if (detectedAgent && detectedAgent.trim()) {
+        const cleanAgent = detectedAgent.trim().toUpperCase();
+        setAgentCode(cleanAgent);
+        sessionStorage.setItem('referredByAgent', cleanAgent);
+        onShowToast(
+          'success',
+          'Agent Link Applied',
+          `Referral link from Sub-Agent ${cleanAgent} activated. Direct commission tagged.`
+        );
+      }
+
+      const netParam = searchParams.get('net') || searchParams.get('network');
+      if (netParam) {
+        const upperNet = netParam.toUpperCase();
+        if (upperNet === 'MTN' || upperNet === 'TELECEL' || upperNet === 'AIRTELTIGO') {
+          setNetwork(upperNet as NetworkOperator);
+        }
+      }
+
+      const typeParam = searchParams.get('type');
+      if (typeParam) {
+        const upperType = typeParam.toUpperCase();
+        if (upperType === 'DATA' || upperType === 'AIRTIME') {
+          setServiceType(upperType as ServiceType);
+        }
+      }
+    } catch (e) {
+      // safe fallback
+    }
+  }, []);
+
   // Auto-detect network from phone
   useEffect(() => {
     if (recipientPhone.length >= 3) {
@@ -300,24 +352,41 @@ export const TelecomStore: React.FC<TelecomStoreProps> = ({
             </div>
 
             {/* Sub-Agent Referral Code Field */}
-            <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 mb-6 transition-colors">
+            <div className={`p-3.5 rounded-xl border mb-6 transition-colors ${
+              agentCode
+                ? 'bg-amber-500/10 border-amber-400/50 dark:bg-amber-950/30 dark:border-amber-500/40'
+                : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700'
+            }`}>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  Sub-Agent Referral Code (Optional)
+                  Sub-Agent Referral Code
                 </label>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">Commission Support</span>
+                {agentCode ? (
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                    ✓ Tagged to {agentCode}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400">Commission Support</span>
+                )}
               </div>
               <input
                 id="store-agent-code-input"
                 type="text"
                 value={agentCode}
-                onChange={(e) => setAgentCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setAgentCode(val);
+                  if (val) sessionStorage.setItem('referredByAgent', val);
+                  else sessionStorage.removeItem('referredByAgent');
+                }}
                 placeholder="e.g. AGT-001"
                 className="w-full px-3 py-1.5 text-xs font-mono font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 uppercase"
               />
               <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                Purchases tagged with an agent code credit their commission wallet instantly on completion.
+                {agentCode
+                  ? `Purchases made with code ${agentCode} credit their commission wallet instantly on checkout.`
+                  : 'Purchases tagged with an agent code credit their commission wallet instantly on completion.'}
               </p>
             </div>
 

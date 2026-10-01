@@ -14,6 +14,15 @@ import {
   Loader2,
   BarChart3,
   Calendar,
+  Share2,
+  ExternalLink,
+  QrCode,
+  Sparkles,
+  MessageSquare,
+  Globe,
+  Check,
+  Radio,
+  X,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -252,6 +261,129 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
     return null;
   };
 
+  // Shareable links state
+  const [selectedShareLinkTab, setSelectedShareLinkTab] = useState<string>('all');
+  const [promoPitchMode, setPromoPitchMode] = useState<'ALL_ROUND' | 'DATA_FOCUSED' | 'AIRTIME_FOCUSED'>('ALL_ROUND');
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+  const [copiedPromoText, setCopiedPromoText] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrModalUrl, setQrModalUrl] = useState('');
+  const [qrModalTitle, setQrModalTitle] = useState('');
+
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://ghanatelecom.com.gh';
+
+  const shareLinks = useMemo(() => {
+    const code = effectiveAgentCode || 'AGT-001';
+    return [
+      {
+        id: 'all',
+        title: 'Universal Store Link',
+        subtitle: 'All Ghana Networks (MTN, Telecel, AirtelTigo)',
+        badge: 'ALL NETWORKS',
+        badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+        url: `${currentOrigin}/buy/${code}`,
+        shortPath: `/buy/${code}`,
+        description: 'Customer opens the main store with all data & airtime bundles. Agent code automatically tagged.',
+      },
+      {
+        id: 'mtn',
+        title: 'MTN Ghana Direct Link',
+        subtitle: 'Pre-selects MTN Data Bundles & Airtime',
+        badge: 'MTN GHANA',
+        badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+        url: `${currentOrigin}/buy/${code}?net=MTN`,
+        shortPath: `/buy/${code}?net=MTN`,
+        description: 'Directly opens MTN packages. Best for MTN WhatsApp groups and status updates.',
+      },
+      {
+        id: 'telecel',
+        title: 'Telecel Ghana Direct Link',
+        subtitle: 'Pre-selects Telecel Cash & Bundles',
+        badge: 'TELECEL',
+        badgeColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+        url: `${currentOrigin}/buy/${code}?net=TELECEL`,
+        shortPath: `/buy/${code}?net=TELECEL`,
+        description: 'Directly opens Telecel packages. Best for Telecel user communities.',
+      },
+      {
+        id: 'airteltigo',
+        title: 'AirtelTigo Direct Link',
+        subtitle: 'Pre-selects AT Money & Big Time Bundles',
+        badge: 'AIRTELTIGO',
+        badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+        url: `${currentOrigin}/buy/${code}?net=AIRTELTIGO`,
+        shortPath: `/buy/${code}?net=AIRTELTIGO`,
+        description: 'Directly opens AirtelTigo packages. Best for AT subscribers.',
+      },
+      {
+        id: 'airtime',
+        title: 'Instant Airtime Recharge Link',
+        subtitle: 'Direct recharge for all phone lines',
+        badge: 'AIRTIME',
+        badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20',
+        url: `${currentOrigin}/buy/${code}?type=AIRTIME`,
+        shortPath: `/buy/${code}?type=AIRTIME`,
+        description: 'Opens Airtime Top-Up mode directly for quick balance top-ups.',
+      },
+    ];
+  }, [currentOrigin, effectiveAgentCode]);
+
+  const activeShareLink = useMemo(() => {
+    return shareLinks.find((l) => l.id === selectedShareLinkTab) || shareLinks[0];
+  }, [shareLinks, selectedShareLinkTab]);
+
+  const getPromoText = (linkUrl: string, mode: 'ALL_ROUND' | 'DATA_FOCUSED' | 'AIRTIME_FOCUSED') => {
+    switch (mode) {
+      case 'DATA_FOCUSED':
+        return `🔥 Unbeatable Ghana Data Bundles! Get high-speed MTN, Telecel & AirtelTigo data with instant automated credit to your phone. Tap to buy: ${linkUrl}`;
+      case 'AIRTIME_FOCUSED':
+        return `⚡ Running low on airtime? Instant mobile recharge for MTN, Telecel & AT with zero transaction fees! Tap here: ${linkUrl}`;
+      case 'ALL_ROUND':
+      default:
+        return `🇬🇭 Need fast Airtime or Data in Ghana? Top up MTN, Telecel & AirtelTigo with instant automated delivery! Pay securely via MoMo or Card. Tap to recharge: ${linkUrl}`;
+    }
+  };
+
+  const handleShareWhatsApp = (url: string) => {
+    const text = getPromoText(url, promoPitchMode);
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareTwitter = (url: string) => {
+    const text = getPromoText(url, promoPitchMode);
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareFacebook = (url: string) => {
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShareTelegram = (url: string) => {
+    const text = getPromoText(url, promoPitchMode);
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyLink = (url: string, id: string, name: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedLinkId(id);
+    onShowToast('success', 'Link Copied', `${name} short link copied! Ready to share.`);
+    setTimeout(() => setCopiedLinkId(null), 2500);
+  };
+
+  const handleCopyPromoMessage = (url: string) => {
+    const text = getPromoText(url, promoPitchMode);
+    navigator.clipboard.writeText(text);
+    setCopiedPromoText(true);
+    onShowToast('success', 'Marketing Pitch Copied', 'Full promotional text and short link copied to clipboard.');
+    setTimeout(() => setCopiedPromoText(false), 2500);
+  };
+
+  const handleOpenQrModal = (url: string, title: string) => {
+    setQrModalUrl(url);
+    setQrModalTitle(title);
+    setIsQrModalOpen(true);
+  };
+
   if (!isRealAgent) {
     return (
       <div id="agent-portal-restricted" className="max-w-2xl mx-auto px-4 py-12">
@@ -336,6 +468,348 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
               {copied ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4" />}
               <span>{copied ? 'Copied' : 'Copy Code'}</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Social Share Links & Marketing Hub */}
+      <div
+        id="agent-social-share-center"
+        className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors space-y-6"
+      >
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+              <Share2 className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-['Outfit',sans-serif]">
+                  Social Media Short Links & Customer Links
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-600 dark:text-amber-400 border border-amber-400/30 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Commission Automated
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                Share these dedicated short links on your WhatsApp status, X (Twitter), Facebook, and Telegram. When customers tap and purchase any package, your sub-agent code is automatically applied and your commission is credited directly to your balance.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 self-start md:self-auto shrink-0">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">Your Tag:</span>
+            <span className="font-mono font-black text-amber-500 dark:text-amber-400 text-sm">
+              {effectiveAgentCode}
+            </span>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              +{effectiveCommissionRate}%
+            </span>
+          </div>
+        </div>
+
+        {/* Link Target Selector Pills */}
+        <div className="space-y-3">
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+            Select Link Target to Share:
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {shareLinks.map((link) => {
+              const isSelected = selectedShareLinkTab === link.id;
+              return (
+                <button
+                  key={link.id}
+                  id={`share-tab-${link.id}`}
+                  onClick={() => setSelectedShareLinkTab(link.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
+                    isSelected
+                      ? 'bg-slate-900 text-white dark:bg-amber-400 dark:text-slate-950 border-slate-900 dark:border-amber-400 shadow-md scale-[1.02]'
+                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5 shrink-0" />
+                  <span>{link.title}</span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                      isSelected
+                        ? 'bg-white/20 text-white dark:bg-slate-950/20 dark:text-slate-950'
+                        : link.badgeColor
+                    }`}
+                  >
+                    {link.badge}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Active Link Featured Showcase Card */}
+        <div className="bg-slate-900 dark:bg-slate-950 rounded-2xl p-5 sm:p-6 border border-slate-800 shadow-xl text-white space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${activeShareLink.badgeColor}`}>
+                  {activeShareLink.badge}
+                </span>
+                <h4 className="text-base font-bold text-white">{activeShareLink.title}</h4>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">{activeShareLink.description}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                id="active-link-qr-btn"
+                onClick={() => handleOpenQrModal(activeShareLink.url, activeShareLink.title)}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="View and download scannable QR Code"
+              >
+                <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                <span>QR Code</span>
+              </button>
+              <a
+                href={activeShareLink.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                id="active-link-test-btn"
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5 transition-colors"
+                title="Test this link as a customer in a new tab"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                <span>Test Link</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Monospaced URL Display Bar with Copy Action */}
+          <div className="bg-slate-950/80 rounded-xl p-2.5 sm:p-3 border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-400 flex items-center justify-center shrink-0">
+                <Globe className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-xs sm:text-sm font-mono font-bold text-amber-300 truncate select-all">
+                {activeShareLink.url}
+              </p>
+            </div>
+            <button
+              type="button"
+              id="active-link-copy-btn"
+              onClick={() => handleCopyLink(activeShareLink.url, activeShareLink.id, activeShareLink.title)}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-slate-950 text-xs font-black rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+            >
+              {copiedLinkId === activeShareLink.id ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-slate-950" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-950" />
+                  <span>Copy Short Link</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Marketing Pitch Customizer */}
+          <div className="space-y-3 pt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-amber-400" /> Choose Promotional Caption Template:
+              </label>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setPromoPitchMode('ALL_ROUND')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                    promoPitchMode === 'ALL_ROUND'
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🚀 All-Round
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPromoPitchMode('DATA_FOCUSED')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                    promoPitchMode === 'DATA_FOCUSED'
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🔥 Data Bundles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPromoPitchMode('AIRTIME_FOCUSED')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer ${
+                    promoPitchMode === 'AIRTIME_FOCUSED'
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ⚡ Fast Airtime
+                </button>
+              </div>
+            </div>
+
+            {/* Live Message Preview */}
+            <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800/80 text-xs text-slate-300 leading-relaxed font-sans relative group">
+              <p>{getPromoText(activeShareLink.url, promoPitchMode)}</p>
+              <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                <span className="text-[10px] text-slate-500">Ready to post directly to social platforms</span>
+                <button
+                  type="button"
+                  id="copy-promo-pitch-btn"
+                  onClick={() => handleCopyPromoMessage(activeShareLink.url)}
+                  className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedPromoText ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-emerald-400">Copied Pitch</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Pitch Text</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Instant Social Media Sharing Buttons */}
+            <div className="pt-2">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                1-Click Instant Share to Social Handles:
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {/* WhatsApp */}
+                <button
+                  type="button"
+                  id="share-btn-whatsapp"
+                  onClick={() => handleShareWhatsApp(activeShareLink.url)}
+                  className="py-2.5 px-3 bg-[#25D366] hover:bg-[#20bd5a] active:bg-[#1caa50] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                  </svg>
+                  <span>WhatsApp</span>
+                </button>
+
+                {/* X (Twitter) */}
+                <button
+                  type="button"
+                  id="share-btn-twitter"
+                  onClick={() => handleShareTwitter(activeShareLink.url)}
+                  className="py-2.5 px-3 bg-black hover:bg-slate-900 active:bg-slate-950 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 border border-slate-700 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  <svg className="w-3.5 h-3.5 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                  <span>Post on X</span>
+                </button>
+
+                {/* Telegram */}
+                <button
+                  type="button"
+                  id="share-btn-telegram"
+                  onClick={() => handleShareTelegram(activeShareLink.url)}
+                  className="py-2.5 px-3 bg-[#0088cc] hover:bg-[#0077b5] active:bg-[#00669c] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.458c.538-.196 1.006.128.832.943z" />
+                  </svg>
+                  <span>Telegram</span>
+                </button>
+
+                {/* Facebook */}
+                <button
+                  type="button"
+                  id="share-btn-facebook"
+                  onClick={() => handleShareFacebook(activeShareLink.url)}
+                  className="py-2.5 px-3 bg-[#1877F2] hover:bg-[#166fe5] active:bg-[#1465d2] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow transition-all cursor-pointer hover:scale-[1.02]"
+                >
+                  <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                  </svg>
+                  <span>Facebook</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick-Copy Grid of All 5 Network Short Links */}
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              All Pre-Configured Short Links (Instant Copy):
+            </h4>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              5 Direct Channels
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {shareLinks.map((link) => (
+              <div
+                key={link.id}
+                className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 flex flex-col justify-between gap-3 transition-colors hover:border-amber-400/50"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${link.badgeColor}`}>
+                      {link.badge}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenQrModal(link.url, link.title)}
+                      className="text-slate-400 hover:text-amber-500 transition-colors p-1 cursor-pointer"
+                      title="View QR Code"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <h5 className="font-bold text-xs text-slate-900 dark:text-white">{link.title}</h5>
+                  <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-1 truncate">
+                    {link.shortPath}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-700/80">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyLink(link.url, link.id, link.title)}
+                    className="flex-1 py-1.5 px-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-[11px] font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {copiedLinkId === link.id ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+                    title="Open link"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -837,6 +1311,75 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Scan Modal */}
+      {isQrModalOpen && (
+        <div
+          id="agent-qr-modal-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+        >
+          <div
+            id="agent-qr-modal-card"
+            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-200 dark:border-slate-800 p-6 space-y-5 text-center relative"
+          >
+            <button
+              onClick={() => setIsQrModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-500 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-400/30">
+              <QrCode className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white font-['Outfit',sans-serif]">
+                Customer QR Scan Code
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {qrModalTitle}
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-inner inline-block mx-auto">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrModalUrl)}`}
+                alt="QR Code"
+                className="w-48 h-48 mx-auto"
+                loading="lazy"
+              />
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5 border border-slate-200 dark:border-slate-700">
+              <p className="text-[11px] font-mono text-slate-600 dark:text-slate-300 break-all select-all">
+                {qrModalUrl}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(qrModalUrl);
+                  onShowToast('success', 'Link Copied', 'Short link copied to clipboard.');
+                }}
+                className="flex-1 py-2.5 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-md"
+              >
+                <Copy className="w-4 h-4" />
+                <span>Copy Link</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsQrModalOpen(false)}
+                className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
