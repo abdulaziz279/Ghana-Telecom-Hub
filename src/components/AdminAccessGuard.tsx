@@ -95,24 +95,14 @@ export const AdminAccessGuard: React.FC<AdminAccessGuardProps> = ({
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             {isAgent ? (
-              <>
-                <button
-                  id="guard-return-agent-btn"
-                  onClick={onReturnToAgent}
-                  className="w-full sm:w-auto px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-sm rounded-xl inline-flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Return to Sub-Agent Portal
-                </button>
-                <button
-                  id="guard-switch-admin-btn"
-                  onClick={onOpenAuth}
-                  className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-bold text-sm rounded-xl inline-flex items-center justify-center gap-2 transition-all border border-slate-700 cursor-pointer"
-                >
-                  <UserCheck className="w-4 h-4 text-amber-400" />
-                  Switch to Administrator Account
-                </button>
-              </>
+              <button
+                id="guard-return-agent-btn"
+                onClick={onReturnToAgent}
+                className="w-full sm:w-auto px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-sm rounded-xl inline-flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Return to Sub-Agent Portal
+              </button>
             ) : isCustomer ? (
               <>
                 <button

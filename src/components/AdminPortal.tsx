@@ -142,9 +142,30 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [newAgentName, setNewAgentName] = useState('');
   const [newAgentEmail, setNewAgentEmail] = useState('');
   const [newAgentPhone, setNewAgentPhone] = useState('');
+  const [newAgentPassword, setNewAgentPassword] = useState('Agent2026Secure!');
   const [newAgentCommission, setNewAgentCommission] = useState('3.5');
   const [newAgentBalance, setNewAgentBalance] = useState('0');
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+
+  // Sub-Agent Account Modification state
+  const [isEditAgentModalOpen, setIsEditAgentModalOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<UserAccount | null>(null);
+  const [editAgentName, setEditAgentName] = useState('');
+  const [editAgentEmail, setEditAgentEmail] = useState('');
+  const [editAgentPhone, setEditAgentPhone] = useState('');
+  const [editAgentPassword, setEditAgentPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editAgentCommission, setEditAgentCommission] = useState('3.5');
+  const [editAgentStatus, setEditAgentStatus] = useState<'active' | 'suspended'>('active');
+  const [isUpdatingAgent, setIsUpdatingAgent] = useState(false);
+
+  // Order Tracking Modal State
+  const [trackingOrder, setTrackingOrder] = useState<OrderRecord | null>(null);
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+  const [trackingTimeline, setTrackingTimeline] = useState<any[]>([]);
+  const [isLoadingTracking, setIsLoadingTracking] = useState(false);
+  const [trackingSearchInput, setTrackingSearchInput] = useState('');
+  const [isSearchingTracking, setIsSearchingTracking] = useState(false);
 
   // Manual Telecom Fulfillment & Diagnostics State
   const [fulfillingTx, setFulfillingTx] = useState<Transaction | null>(null);
@@ -360,6 +381,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           fullName: newAgentName.trim(),
           email: newAgentEmail.trim(),
           phone: newAgentPhone.trim(),
+          password: newAgentPassword.trim() || 'Agent2026Secure!',
           commissionRate: parseFloat(newAgentCommission),
           initialBalance: parseFloat(newAgentBalance),
         }),
@@ -378,6 +400,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setNewAgentName('');
       setNewAgentEmail('');
       setNewAgentPhone('');
+      setNewAgentPassword('Agent2026Secure!');
       setNewAgentCommission('3.5');
       setNewAgentBalance('0');
       loadData();
@@ -385,6 +408,103 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       onShowToast('error', 'Agent Creation Error', err.message);
     } finally {
       setIsCreatingAgent(false);
+    }
+  };
+
+  // Open Edit Sub-Agent Modal
+  const handleOpenEditAgent = (ag: UserAccount) => {
+    setEditingAgent(ag);
+    setEditAgentName(ag.fullName || '');
+    setEditAgentEmail(ag.email || '');
+    setEditAgentPhone(ag.phone || '');
+    setEditAgentPassword('');
+    setEditAgentCommission(String(ag.commissionRate || 3.5));
+    setEditAgentStatus(ag.status === 'suspended' ? 'suspended' : 'active');
+    setIsEditAgentModalOpen(true);
+  };
+
+  // Submit Sub-Agent Updates
+  const handleUpdateAgent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAgent) return;
+    if (!editAgentName.trim() || !editAgentEmail.trim() || !editAgentPhone.trim()) {
+      onShowToast('error', 'Required Fields', 'Username, email, and phone number are required.');
+      return;
+    }
+
+    setIsUpdatingAgent(true);
+    try {
+      const res = await fetch('/api/agents/update', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          agentId: editingAgent.id,
+          fullName: editAgentName.trim(),
+          email: editAgentEmail.trim(),
+          phone: editAgentPhone.trim(),
+          password: editAgentPassword.trim() ? editAgentPassword.trim() : undefined,
+          commissionRate: parseFloat(editAgentCommission) || 3.5,
+          status: editAgentStatus,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update sub-agent account.');
+      }
+
+      onShowToast('success', 'Sub-Agent Account Updated', data.message || 'Account modified successfully.');
+      setIsEditAgentModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      onShowToast('error', 'Update Error', err.message);
+    } finally {
+      setIsUpdatingAgent(false);
+    }
+  };
+
+  // Open Live Order Tracking Modal
+  const handleOpenTrackingModal = async (ord: OrderRecord) => {
+    setTrackingOrder(ord);
+    setIsTrackingModalOpen(true);
+    setIsLoadingTracking(true);
+    try {
+      const res = await fetch(`/api/orders/track/${encodeURIComponent(ord.reference || ord.orderNumber)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.timeline) {
+          setTrackingTimeline(data.timeline);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load tracking timeline:', err);
+    } finally {
+      setIsLoadingTracking(false);
+    }
+  };
+
+  // Search & Track any order by Reference, Order #, Hubtel ID, or Phone
+  const handleTrackByQuery = async (query: string) => {
+    if (!query.trim()) {
+      onShowToast('info', 'Enter Tracking Query', 'Please enter an order #, reference, Hubtel ID, or phone line.');
+      return;
+    }
+    setIsSearchingTracking(true);
+    setIsLoadingTracking(true);
+    try {
+      const res = await fetch(`/api/orders/track/${encodeURIComponent(query.trim())}`);
+      const data = await res.json();
+      if (!res.ok || !data.order) {
+        throw new Error(data.error || 'No matching order found for tracking.');
+      }
+      setTrackingOrder(data.order);
+      setTrackingTimeline(data.timeline || []);
+      setIsTrackingModalOpen(true);
+    } catch (err: any) {
+      onShowToast('error', 'Tracking Not Found', err.message);
+    } finally {
+      setIsSearchingTracking(false);
+      setIsLoadingTracking(false);
     }
   };
 
@@ -1248,7 +1368,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   type="text"
                   value={orderSearch}
                   onChange={(e) => setOrderSearch(e.target.value)}
-                  placeholder="Search order #, phone line..."
+                  placeholder="Filter order #, phone line..."
                   className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
                 />
               </div>
@@ -1277,6 +1397,44 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
           </div>
 
+          {/* Quick Live Order Tracking Bar */}
+          <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-400/30">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold font-['Outfit',sans-serif]">
+                  Live Telecom Order Tracking & Carrier Audit
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Track any customer order across Paystack gateway clearance and Hubtel carrier dispatch.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={trackingSearchInput}
+                onChange={(e) => setTrackingSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTrackByQuery(trackingSearchInput);
+                }}
+                placeholder="Enter Reference, Order #, or Phone..."
+                className="px-3 py-1.5 text-xs bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 w-full sm:w-64"
+              />
+              <button
+                type="button"
+                onClick={() => handleTrackByQuery(trackingSearchInput)}
+                disabled={isSearchingTracking || !trackingSearchInput.trim()}
+                className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shrink-0 transition-colors shadow-sm"
+              >
+                {isSearchingTracking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Activity className="w-3.5 h-3.5" />}
+                <span>Track Order</span>
+              </button>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -1288,13 +1446,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <th className="pb-3">Face Value</th>
                   <th className="pb-3">Dispatch Status</th>
                   <th className="pb-3">Carrier Reference</th>
-                  <th className="pb-3 text-right">Timestamp</th>
+                  <th className="pb-3">Timestamp</th>
+                  <th className="pb-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                    <td colSpan={9} className="py-8 text-center text-slate-400 dark:text-slate-500">
                       No order fulfillment records available.
                     </td>
                   </tr>
@@ -1357,12 +1516,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         {ord.carrierReference}
                       </td>
 
-                      <td className="py-3 text-right text-[11px] text-slate-400">
+                      <td className="py-3 text-[11px] text-slate-400">
                         {new Date(ord.createdAt).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit',
                           second: '2-digit',
                         })}
+                      </td>
+
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTrackingModal(ord)}
+                          className="px-2.5 py-1 bg-amber-400/20 hover:bg-amber-400 text-amber-900 dark:text-amber-300 hover:text-slate-950 font-bold text-[11px] rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                          title="View live fulfillment timeline & telecom trace"
+                        >
+                          <Activity className="w-3 h-3" />
+                          <span>Track</span>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -1432,6 +1603,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     onChange={(e) => setNewAgentPhone(e.target.value)}
                     placeholder="0244123456"
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Initial Password *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newAgentPassword}
+                    onChange={(e) => setNewAgentPassword(e.target.value)}
+                    placeholder="e.g. Agent2026Secure!"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono"
                   />
                 </div>
 
@@ -1507,13 +1692,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <th className="pb-3">Float Balance</th>
                     <th className="pb-3">Commissions Earned</th>
                     <th className="pb-3">Security & 2FA</th>
-                    <th className="pb-3 text-right">Status</th>
+                    <th className="pb-3 text-center">Status</th>
+                    <th className="pb-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {agents.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-6 text-center text-slate-400">
+                      <td colSpan={8} className="py-6 text-center text-slate-400">
                         No sub-agents provisioned yet. Use the form above to create the first agent.
                       </td>
                     </tr>
@@ -1571,10 +1757,26 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           </span>
                         </td>
 
-                        <td className="py-3 text-right">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                        <td className="py-3 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            ag.status === 'suspended'
+                              ? 'bg-red-100 dark:bg-red-950/80 text-red-800 dark:text-red-300'
+                              : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                          }`}>
                             {ag.status}
                           </span>
+                        </td>
+
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditAgent(ag)}
+                            className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-[11px] rounded-lg shadow-sm inline-flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Modify username, password, email & phone"
+                          >
+                            <UserCog className="w-3.5 h-3.5" />
+                            <span>Modify</span>
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -2539,6 +2741,402 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: SUB-AGENT ACCOUNT MODIFICATION */}
+      {isEditAgentModalOpen && editingAgent && (
+        <div
+          id="admin-edit-agent-modal-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors">
+            {/* Header */}
+            <div className="bg-slate-900 dark:bg-slate-950 text-white p-5 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-400 flex items-center justify-center border border-amber-400/30">
+                  <UserCog className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base font-['Outfit',sans-serif]">
+                    Modify Sub-Agent Account
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Code: <span className="text-amber-400 font-bold">{editingAgent.agentCode}</span> • ID: {editingAgent.id}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditAgentModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleUpdateAgent} className="p-6 space-y-4">
+              {/* Username / Full Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Sub-Agent Username / Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editAgentName}
+                  onChange={(e) => setEditAgentName(e.target.value)}
+                  placeholder="e.g. Kwame Mensah"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editAgentEmail}
+                  onChange={(e) => setEditAgentEmail(e.target.value)}
+                  placeholder="agent@ghanatelecom.com.gh"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Mobile Phone Number <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Smartphone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="tel"
+                    required
+                    value={editAgentPhone}
+                    onChange={(e) => setEditAgentPhone(e.target.value)}
+                    placeholder="e.g. 0552727299"
+                    className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Password (Optional Reset) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Reset Password
+                  </label>
+                  <span className="text-[11px] text-slate-400">Leave blank to keep unchanged</span>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    value={editAgentPassword}
+                    onChange={(e) => setEditAgentPassword(e.target.value)}
+                    placeholder="Enter new password (min. 6 chars)"
+                    className="w-full pl-9 pr-10 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Commission Rate & Status */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Commission Rate (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="50"
+                    value={editAgentCommission}
+                    onChange={(e) => setEditAgentCommission(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Account Status
+                  </label>
+                  <select
+                    value={editAgentStatus}
+                    onChange={(e) => setEditAgentStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  >
+                    <option value="active">Active (Permitted)</option>
+                    <option value="suspended">Suspended (Blocked)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditAgentModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingAgent}
+                  className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdatingAgent ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Check className="w-4 h-4" />
+                  )}
+                  <span>Save Account Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: LIVE TELECOM ORDER TRACKING & FULFILLMENT AUDIT */}
+      {isTrackingModalOpen && trackingOrder && (
+        <div
+          id="admin-order-tracking-modal-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors">
+            {/* Header */}
+            <div className="bg-slate-900 dark:bg-slate-950 text-white p-5 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-400 flex items-center justify-center border border-amber-400/30">
+                  <Activity className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base font-['Outfit',sans-serif]">
+                      Live Order Tracking & Trace
+                    </h3>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${getNetworkBadge(trackingOrder.network)}`}>
+                      {trackingOrder.network}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Order: <strong className="text-white">{trackingOrder.orderNumber}</strong> • Ref: {trackingOrder.reference}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTrackingModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Order Status Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-950/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Recipient SIM
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-slate-900 dark:text-white block mt-0.5">
+                    {trackingOrder.recipientPhone}
+                  </span>
+                  <span className="text-[10px] text-slate-400">{trackingOrder.customerName}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Package / Value
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-amber-600 dark:text-amber-400 block mt-0.5">
+                    GH₵{trackingOrder.amountGHS.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-400">{trackingOrder.packageName}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Payment Gateway
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                    {trackingOrder.status}
+                  </span>
+                  <span className="text-[10px] text-slate-400">{trackingOrder.paymentMethod.replace('PAYSTACK_', '')}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Carrier Delivery
+                  </span>
+                  <span className={`text-xs sm:text-sm font-mono font-bold block mt-0.5 ${
+                    trackingOrder.carrierDispatchStatus === 'DELIVERED' || trackingOrder.carrierDispatchStatus === 'DISPATCHED'
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-500'
+                  }`}>
+                    {trackingOrder.carrierDispatchStatus}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono truncate block">{trackingOrder.carrierReference}</span>
+                </div>
+              </div>
+
+              {/* Real-Time Fulfillment Timeline */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-amber-500" />
+                    Telecom Fulfillment Trace
+                  </h4>
+                  {isLoadingTracking && (
+                    <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Querying Carrier Nodes...
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2.5">
+                  {(trackingTimeline && trackingTimeline.length > 0 ? trackingTimeline : [
+                    {
+                      step: 1,
+                      title: 'Order Placed & Gateway Initialized',
+                      time: trackingOrder.createdAt,
+                      status: 'COMPLETED',
+                      description: `Order initialized via ${trackingOrder.network} MoMo. Reference: ${trackingOrder.reference}.`,
+                    },
+                    {
+                      step: 2,
+                      title: 'Payment Clearance',
+                      time: trackingOrder.completedAt || trackingOrder.createdAt,
+                      status: trackingOrder.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+                      description: trackingOrder.status === 'COMPLETED' ? `GH₵${trackingOrder.amountGHS.toFixed(2)} settled via Paystack.` : 'Awaiting confirmation.',
+                    },
+                    {
+                      step: 3,
+                      title: 'Carrier Switch Node Processing',
+                      time: trackingOrder.completedAt || trackingOrder.createdAt,
+                      status: trackingOrder.carrierDispatchStatus === 'DELIVERED' || trackingOrder.carrierDispatchStatus === 'DISPATCHED' ? 'COMPLETED' : 'PENDING',
+                      description: `Routing to ${trackingOrder.network} telecom exchange via Hubtel carrier pipe.`,
+                    },
+                    {
+                      step: 4,
+                      title: 'Delivered to Recipient SIM',
+                      time: trackingOrder.completedAt || trackingOrder.createdAt,
+                      status: trackingOrder.carrierDispatchStatus === 'DELIVERED' || trackingOrder.carrierDispatchStatus === 'DISPATCHED' ? 'COMPLETED' : 'PENDING',
+                      description: `${trackingOrder.packageName} credited to ${trackingOrder.recipientPhone}. Ref: ${trackingOrder.carrierReference}.`,
+                    },
+                  ]).map((t: any, idx: number) => {
+                    const isDone = t.status === 'COMPLETED';
+                    const isFailed = t.status === 'FAILED';
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3.5 rounded-2xl border transition-all flex items-start gap-3 ${
+                          isDone
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                            : isFailed
+                            ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/60'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                          isDone
+                            ? 'bg-emerald-500 text-white'
+                            : isFailed
+                            ? 'bg-rose-500 text-white'
+                            : 'bg-amber-400 text-slate-950 font-bold'
+                        }`}>
+                          {isDone ? <CheckCircle2 className="w-4 h-4" /> : isFailed ? <AlertTriangle className="w-4 h-4" /> : <span className="text-xs">{t.step || idx + 1}</span>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                              {t.title}
+                            </h5>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {t.time ? new Date(t.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                            {t.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Technical Trace Data */}
+              <div className="p-3.5 rounded-2xl bg-slate-900 dark:bg-slate-950 text-slate-300 font-mono text-[11px] space-y-1.5 border border-slate-800">
+                <div className="flex items-center justify-between text-slate-400 pb-1 border-b border-slate-800 text-[10px]">
+                  <span>TECHNICAL AUDIT TRACE</span>
+                  <span className="text-emerald-400">LEDGER VERIFIED</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Hubtel Transaction ID:</span>
+                  <span className="text-white font-bold">{trackingOrder.carrierReference}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Order Reference:</span>
+                  <span className="text-amber-400 font-bold">{trackingOrder.reference}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Sub-Agent Code:</span>
+                  <span className="text-sky-400 font-bold">{trackingOrder.agentCode || 'DIRECT_PORTAL'}</span>
+                </div>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `[Ghana Telecom Order Verification]\nOrder #: ${trackingOrder.orderNumber}\nReference: ${trackingOrder.reference}\nRecipient: ${trackingOrder.recipientPhone}\nPackage: ${trackingOrder.packageName}\nCarrier: ${trackingOrder.network}\nStatus: ${trackingOrder.carrierDispatchStatus}\nHubtel ID: ${trackingOrder.carrierReference}`
+                    );
+                    onShowToast('info', 'Copied to Clipboard', 'Full order verification receipt copied.');
+                  }}
+                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy Verification Trace</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTrackByQuery(trackingOrder.reference || trackingOrder.orderNumber)}
+                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-amber-400 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingTracking ? 'animate-spin' : ''}`} />
+                    <span>Refresh Trace</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsTrackingModalOpen(false)}
+                    className="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-sm"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

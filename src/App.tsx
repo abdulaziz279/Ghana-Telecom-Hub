@@ -238,32 +238,34 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Admin / Developer Login Button in Red Color with subtle pulse animation when unauthenticated */}
-            <button
-              id="footer-admin-dev-login-btn"
-              onClick={() => {
-                if (currentUser?.role === 'ADMIN' && currentTab !== 'admin') {
-                  setCurrentTab('admin');
-                  showToast('info', 'Admin Access', 'Navigated to Administrator Dashboard.');
-                } else {
-                  setAuthInitialRole('ADMIN');
-                  setIsAuthOpen(true);
-                }
-              }}
-              className={`px-3.5 py-1.5 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md shadow-red-950/50 border border-red-500/60 flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
-                !currentUser ? 'animate-pulse hover:animate-none ring-2 ring-red-500/50 shadow-red-600/40' : ''
-              }`}
-              title="Administrator & Developer Portal Login"
-            >
-              {!currentUser && (
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                </span>
-              )}
-              <LogIn className="w-3.5 h-3.5 text-white" />
-              <span>Admin / Developer Login</span>
-            </button>
+            {/* Admin / Developer Login Button: Hidden when on sub-agent dashboard or when signed in as an agent */}
+            {currentTab !== 'agent' && currentUser?.role !== 'AGENT' && (
+              <button
+                id="footer-admin-dev-login-btn"
+                onClick={() => {
+                  if (currentUser?.role === 'ADMIN' && currentTab !== 'admin') {
+                    setCurrentTab('admin');
+                    showToast('info', 'Admin Access', 'Navigated to Administrator Dashboard.');
+                  } else {
+                    setAuthInitialRole('ADMIN');
+                    setIsAuthOpen(true);
+                  }
+                }}
+                className={`px-3.5 py-1.5 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md shadow-red-950/50 border border-red-500/60 flex items-center gap-1.5 transition-all duration-150 cursor-pointer ${
+                  !currentUser ? 'animate-pulse hover:animate-none ring-2 ring-red-500/50 shadow-red-600/40' : ''
+                }`}
+                title="Administrator & Developer Portal Login"
+              >
+                {!currentUser && (
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                  </span>
+                )}
+                <LogIn className="w-3.5 h-3.5 text-white" />
+                <span>Admin / Developer Login</span>
+              </button>
+            )}
 
             <div className="text-[11px] text-slate-500">
               © {new Date().getFullYear()} Ghana Telecom. Production Release v2.4.

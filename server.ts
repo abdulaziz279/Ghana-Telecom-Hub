@@ -22,6 +22,7 @@ import {
   CommissionPayout,
   GatewaySettings,
   AnalyticsSummary,
+  OrderRecord,
 } from './src/types';
 
 const app = express();
@@ -923,7 +924,7 @@ app.get('/api/paystack/status/:reference', async (req, res) => {
   // Throttle check to avoid Paystack rate limits / Cloudflare 429 HTML blocks
   const now = Date.now();
   const cached = paystackStatusCache.get(reference);
-  if (cached && (now - cached.timestamp < 3500)) {
+  if (cached && (now - cached.timestamp < 1500)) {
     return res.json(cached.data);
   }
 
@@ -1315,7 +1316,7 @@ app.get('/api/agents', requireAdmin, (req, res) => {
 
 // Admin creates a new Sub-Agent with specific commission base
 app.post('/api/agents/create', requireAdmin, (req, res) => {
-  const { fullName, email, phone, commissionRate, initialBalance } = req.body;
+  const { fullName, email, phone, password, commissionRate, initialBalance } = req.body;
   const ip = getClientIp(req);
   const db = loadDatabase();
 
@@ -1337,6 +1338,7 @@ app.post('/api/agents/create', requireAdmin, (req, res) => {
     email: email.trim().toLowerCase(),
     phone: phone.trim(),
     role: 'AGENT',
+    password: password && password.trim() ? password.trim() : 'Agent2026Secure!',
     agentCode,
     commissionRate: rate,
     balanceGHS: Number(initialBalance) || 0,
@@ -1379,6 +1381,96 @@ app.post('/api/agents/create', requireAdmin, (req, res) => {
     success: true,
     agent: newAgent,
     message: `Sub-agent account created with agent code: ${agentCode} and ${rate}% commission base.`,
+  });
+});
+
+// Admin modifies Sub-Agent account (username/fullName, email, phone, password, commissionRate, status)
+app.post('/api/agents/update', requireAdmin, (req, res) => {
+  const { agentId, fullName, email, phone, password, commissionRate, status } = req.body;
+  const ip = getClientIp(req);
+  const db = loadDatabase();
+
+  if (!agentId) {
+    return res.status(400).json({ error: 'Agent ID is required.' });
+  }
+
+  const agent = db.users.find((u) => u.id === agentId && u.role === 'AGENT');
+  if (!agent) {
+    return res.status(404).json({ error: 'Sub-agent account not found.' });
+  }
+
+  // If email is changed, ensure no duplicate
+  if (email && email.trim().toLowerCase() !== agent.email.toLowerCase()) {
+    const conflict = db.users.find(
+      (u) => u.id !== agent.id && u.email.toLowerCase() === email.trim().toLowerCase()
+    );
+    if (conflict) {
+      return res.status(400).json({ error: 'Another account already uses this email address.' });
+    }
+    agent.email = email.trim().toLowerCase();
+  }
+
+  if (fullName && fullName.trim()) {
+    agent.fullName = fullName.trim();
+  }
+
+  if (phone && phone.trim()) {
+    agent.phone = phone.trim();
+  }
+
+  if (password && password.trim()) {
+    agent.password = password.trim();
+  }
+
+  if (commissionRate !== undefined && !isNaN(Number(commissionRate))) {
+    agent.commissionRate = Number(commissionRate);
+  }
+
+  if (status && (status === 'active' || status === 'suspended')) {
+    agent.status = status;
+  }
+
+  saveDatabase(db);
+  syncAgentToFirestore(agent);
+
+  recordAuditLog({
+    actorId: 'ADMIN',
+    actorEmail: 'admin@ghanatelecom.com.gh',
+    actorRole: 'ADMIN',
+    action: 'UPDATE_SUB_AGENT_ACCOUNT',
+    target: agent.id,
+    ipAddress: ip,
+    userAgent: req.headers['user-agent'] || 'Unknown',
+    status: 'SUCCESS',
+    severity: 'MEDIUM',
+    details: {
+      agentId: agent.id,
+      agentCode: agent.agentCode,
+      updatedFields: {
+        fullName: agent.fullName,
+        email: agent.email,
+        phone: agent.phone,
+        passwordUpdated: Boolean(password && password.trim()),
+        commissionRate: agent.commissionRate,
+        status: agent.status,
+      },
+    },
+  });
+
+  triggerCrmWebhook('SUB_AGENT_UPDATED', {
+    agentId: agent.id,
+    agentCode: agent.agentCode,
+    name: agent.fullName,
+    email: agent.email,
+    phone: agent.phone,
+    commissionRate: agent.commissionRate,
+    status: agent.status,
+  });
+
+  res.json({
+    success: true,
+    agent,
+    message: `Sub-agent account ${agent.fullName} (${agent.agentCode}) updated successfully.`,
   });
 });
 
@@ -1521,11 +1613,11 @@ app.get('/api/transactions', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// ORDERS & CARRIER DISPATCH HISTORY (Admin view)
+// ORDERS & CARRIER DISPATCH TRACKING (Admin & Sub-Agent view)
 // -------------------------------------------------------------
-app.get('/api/orders', requireAdmin, (req, res) => {
+app.get('/api/orders', (req, res) => {
   const db = loadDatabase();
-  const { network, status, search } = req.query;
+  const { network, status, search, agentCode } = req.query;
 
   let orders = db.transactions.map((tx) => ({
     id: `order-${tx.id.replace('tx-', '')}`,
@@ -1545,9 +1637,15 @@ app.get('/api/orders', requireAdmin, (req, res) => {
     customerEmail: tx.customerEmail || 'customer@ghanatelecom.com.gh',
     paymentMethod: tx.paymentMethod,
     agentCode: tx.agentCode || 'DIRECT',
+    commissionEarnedGHS: tx.commissionEarnedGHS || 0,
     createdAt: tx.createdAt,
     completedAt: tx.completedAt || tx.createdAt,
+    failureReason: tx.failureReason || null,
   }));
+
+  if (agentCode && agentCode !== 'ALL') {
+    orders = orders.filter((o) => (o.agentCode || '').toUpperCase() === String(agentCode).toUpperCase());
+  }
 
   if (network && network !== 'ALL') {
     orders = orders.filter((o) => o.network.toUpperCase() === String(network).toUpperCase());
@@ -1560,14 +1658,97 @@ app.get('/api/orders', requireAdmin, (req, res) => {
     orders = orders.filter(
       (o) =>
         o.orderNumber.toLowerCase().includes(q) ||
+        o.reference.toLowerCase().includes(q) ||
         o.recipientPhone.includes(q) ||
         o.customerName.toLowerCase().includes(q) ||
         o.carrierReference.toLowerCase().includes(q) ||
-        o.packageName.toLowerCase().includes(q)
+        o.packageName.toLowerCase().includes(q) ||
+        (o.agentCode && o.agentCode.toLowerCase().includes(q))
     );
   }
 
   res.json(orders);
+});
+
+// Live Order Tracking Lookup by Order Number, Reference, Hubtel ID, or Phone
+app.get('/api/orders/track/:query', (req, res) => {
+  const q = String(req.params.query || '').trim().toLowerCase();
+  const db = loadDatabase();
+  const tx = db.transactions.find(
+    (t) =>
+      t.reference.toLowerCase() === q ||
+      t.id.toLowerCase() === q ||
+      (t.hubtelTransactionId && t.hubtelTransactionId.toLowerCase() === q) ||
+      `ord-gh-${(t.reference || '').slice(-8)}`.toLowerCase() === q ||
+      t.recipientPhone.replace(/\D/g, '') === q.replace(/\D/g, '')
+  );
+
+  if (!tx) {
+    return res.status(404).json({ error: 'Order not found with provided reference, order # or phone.' });
+  }
+
+  const orderRecord: OrderRecord = {
+    id: `order-${tx.id.replace('tx-', '')}`,
+    orderNumber: `ORD-GH-${(tx.reference || '').slice(-8)}`,
+    transactionId: tx.id,
+    reference: tx.reference,
+    recipientPhone: tx.recipientPhone,
+    network: tx.network,
+    serviceType: tx.serviceType,
+    packageName: tx.packageName,
+    dataVolume: tx.dataVolume || '',
+    amountGHS: tx.amountGHS,
+    status: tx.paymentStatus === 'success' ? 'COMPLETED' : tx.paymentStatus.toUpperCase(),
+    carrierDispatchStatus: tx.dispatchStatus === 'dispatched' ? 'DELIVERED' : tx.dispatchStatus.toUpperCase(),
+    carrierReference: tx.hubtelTransactionId || `HUB-GH-${(tx.reference || '').slice(-6)}`,
+    customerName: tx.customerName || 'Customer',
+    customerEmail: tx.customerEmail || 'customer@ghanatelecom.com.gh',
+    paymentMethod: tx.paymentMethod,
+    agentCode: tx.agentCode || 'DIRECT',
+    createdAt: tx.createdAt,
+    completedAt: tx.completedAt || tx.createdAt,
+  };
+
+  res.json({
+    success: true,
+    order: orderRecord,
+    timeline: [
+      {
+        step: 1,
+        title: 'Order Placed & Gateway Initialized',
+        time: tx.createdAt,
+        status: 'COMPLETED',
+        description: `Order initialized via ${tx.paymentMethod === 'PAYSTACK_MOMO' ? `${tx.network} Mobile Money` : 'Card'}. Reference: ${tx.reference}.`,
+      },
+      {
+        step: 2,
+        title: 'Payment Clearance',
+        time: tx.completedAt || tx.createdAt,
+        status: tx.paymentStatus === 'success' ? 'COMPLETED' : tx.paymentStatus === 'failed' ? 'FAILED' : 'PENDING',
+        description: tx.paymentStatus === 'success'
+          ? `GH₵${tx.amountGHS.toFixed(2)} payment settled successfully.`
+          : tx.paymentStatus === 'failed'
+          ? `Payment failed: ${tx.failureReason || 'Authorization declined.'}`
+          : 'Awaiting customer 4-digit PIN authorization on phone handset.',
+      },
+      {
+        step: 3,
+        title: 'Carrier Telecom Node Processing',
+        time: tx.completedAt || tx.createdAt,
+        status: tx.dispatchStatus === 'dispatched' ? 'COMPLETED' : tx.dispatchStatus === 'failed' ? 'FAILED' : 'PROCESSING',
+        description: `Dispatched to ${tx.network} Ghana telecom switch via Hubtel Carrier API.`,
+      },
+      {
+        step: 4,
+        title: 'Delivered to Recipient SIM',
+        time: tx.completedAt || tx.createdAt,
+        status: tx.dispatchStatus === 'dispatched' ? 'COMPLETED' : tx.dispatchStatus === 'failed' ? 'FAILED' : 'PENDING',
+        description: tx.dispatchStatus === 'dispatched'
+          ? `${tx.serviceType === 'DATA' ? tx.packageName : `GH₵${tx.amountGHS.toFixed(2)} Airtime`} credited to ${tx.recipientPhone}. Hubtel ID: ${tx.hubtelTransactionId}.`
+          : 'Pending final carrier fulfillment confirmation.',
+      },
+    ],
+  });
 });
 
 // -------------------------------------------------------------

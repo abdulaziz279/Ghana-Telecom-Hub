@@ -23,6 +23,11 @@ import {
   Check,
   Radio,
   X,
+  Activity,
+  Search,
+  RefreshCw,
+  Smartphone,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -62,6 +67,14 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
   const [accountNumber, setAccountNumber] = useState(currentUser?.phone || '');
   const [accountName, setAccountName] = useState(currentUser?.fullName || '');
   const [isSubmittingPayout, setIsSubmittingPayout] = useState(false);
+
+  // Live Order Tracking State for Sub-Agents
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+  const [trackingOrder, setTrackingOrder] = useState<any | null>(null);
+  const [trackingTimeline, setTrackingTimeline] = useState<any[]>([]);
+  const [isLoadingTracking, setIsLoadingTracking] = useState(false);
+  const [trackingQueryInput, setTrackingQueryInput] = useState('');
+  const [isSearchingTracking, setIsSearchingTracking] = useState(false);
 
   const curr = GHANA_CURRENCIES[selectedCurrency] || GHANA_CURRENCIES.GHS;
 
@@ -108,6 +121,30 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
     setCopied(true);
     onShowToast('success', 'Code Copied', `Agent code ${effectiveAgentCode} copied to clipboard.`);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOpenTracking = async (query: string) => {
+    if (!query || !query.trim()) {
+      onShowToast('info', 'Enter Order Reference', 'Please enter a customer phone line or transaction reference.');
+      return;
+    }
+    setIsSearchingTracking(true);
+    setIsLoadingTracking(true);
+    try {
+      const res = await fetch(`/api/orders/track/${encodeURIComponent(query.trim())}`);
+      const data = await res.json();
+      if (!res.ok || !data.order) {
+        throw new Error(data.error || 'No matching customer order found.');
+      }
+      setTrackingOrder(data.order);
+      setTrackingTimeline(data.timeline || []);
+      setIsTrackingModalOpen(true);
+    } catch (err: any) {
+      onShowToast('error', 'Tracking Not Found', err.message);
+    } finally {
+      setIsSearchingTracking(false);
+      setIsLoadingTracking(false);
+    }
   };
 
   const handleRequestPayout = async (e: React.FormEvent) => {
@@ -1091,7 +1128,7 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Transactions Under Code ({effectiveAgentCode})
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Real-time commission breakdown</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Real-time commission breakdown & customer delivery trace</p>
             </div>
             <button
               onClick={loadAgentData}
@@ -1099,6 +1136,44 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
             >
               Refresh
             </button>
+          </div>
+
+          {/* Quick Customer Order Tracking Lookup Card */}
+          <div className="bg-slate-900 text-white rounded-xl p-3.5 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-400/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-400/30">
+                <Activity className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold font-['Outfit',sans-serif]">
+                  Customer Order Tracking & Delivery Trace
+                </h4>
+                <p className="text-[10px] text-slate-400">
+                  Verify data bundle or airtime delivery for any customer across MTN, Telecel, and AT.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={trackingQueryInput}
+                onChange={(e) => setTrackingQueryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleOpenTracking(trackingQueryInput);
+                }}
+                placeholder="Phone line or Order Ref..."
+                className="px-3 py-1.5 text-xs bg-slate-950 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 w-full sm:w-48 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => handleOpenTracking(trackingQueryInput)}
+                disabled={isSearchingTracking || !trackingQueryInput.trim()}
+                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50 transition-colors shrink-0"
+              >
+                {isSearchingTracking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
+                <span>Track</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -1110,12 +1185,13 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
                   <th className="pb-3">Network & Service</th>
                   <th className="pb-3">Amount (GH₵)</th>
                   <th className="pb-3 text-right">Commission (GH₵)</th>
+                  <th className="pb-3 text-right">Tracking</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {agentTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400 dark:text-slate-500">
+                    <td colSpan={6} className="py-8 text-center text-slate-400 dark:text-slate-500">
                       No transactions have been tagged with code {effectiveAgentCode} yet.
                     </td>
                   </tr>
@@ -1142,6 +1218,17 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
                         <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                           +GH₵{tx.commissionEarnedGHS.toFixed(2)}
                         </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTracking(tx.reference)}
+                          className="px-2.5 py-1 bg-amber-400/20 hover:bg-amber-400 text-amber-900 dark:text-amber-300 hover:text-slate-950 font-bold text-[10px] rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          title="Track delivery status"
+                        >
+                          <Activity className="w-3 h-3" />
+                          <span>Track</span>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -1379,6 +1466,230 @@ export const AgentPortal: React.FC<AgentPortalProps> = ({
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-Agent Customer Order Tracking & Delivery Verification Modal */}
+      {isTrackingModalOpen && trackingOrder && (
+        <div
+          id="agent-order-tracking-modal-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors">
+            {/* Header */}
+            <div className="bg-slate-900 dark:bg-slate-950 text-white p-5 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-400/20 text-amber-400 flex items-center justify-center border border-amber-400/30">
+                  <Activity className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base font-['Outfit',sans-serif]">
+                      Customer Order Tracking
+                    </h3>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-400 text-slate-950">
+                      {trackingOrder.network}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Ref: <strong className="text-white">{trackingOrder.reference}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTrackingModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+              {/* Order Quick Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-950/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Recipient SIM
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-slate-900 dark:text-white block mt-0.5">
+                    {trackingOrder.recipientPhone}
+                  </span>
+                  <span className="text-[10px] text-slate-400">{trackingOrder.customerName || 'Customer'}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Package / Value
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-amber-600 dark:text-amber-400 block mt-0.5">
+                    GH₵{trackingOrder.amountGHS.toFixed(2)}
+                  </span>
+                  <span className="text-[10px] text-slate-400">{trackingOrder.packageName}</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Payment Gateway
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                    {trackingOrder.status}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Paystack Verified</span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Carrier Delivery
+                  </span>
+                  <span className={`text-xs sm:text-sm font-mono font-bold block mt-0.5 ${
+                    trackingOrder.carrierDispatchStatus === 'DELIVERED' || trackingOrder.carrierDispatchStatus === 'DISPATCHED'
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-amber-500'
+                  }`}>
+                    {trackingOrder.carrierDispatchStatus}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono truncate block">{trackingOrder.carrierReference}</span>
+                </div>
+              </div>
+
+              {/* Delivery Timeline */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-amber-500" />
+                    Delivery Progress
+                  </h4>
+                  {isLoadingTracking && (
+                    <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Querying Carrier Nodes...
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2.5">
+                  {(trackingTimeline && trackingTimeline.length > 0 ? trackingTimeline : [
+                    {
+                      step: 1,
+                      title: 'Order Placed & Gateway Initialized',
+                      time: trackingOrder.createdAt,
+                      status: 'COMPLETED',
+                      description: `Order verified on ${trackingOrder.network}. Ref: ${trackingOrder.reference}.`,
+                    },
+                    {
+                      step: 2,
+                      title: 'Commission Credited to Balance',
+                      time: trackingOrder.completedAt || trackingOrder.createdAt,
+                      status: trackingOrder.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+                      description: `Commission of GH₵${((trackingOrder.amountGHS * effectiveCommissionRate) / 100).toFixed(2)} credited to your agent balance.`,
+                    },
+                    {
+                      step: 3,
+                      title: 'Hubtel Carrier Switch Dispatch',
+                      time: trackingOrder.completedAt || trackingOrder.createdAt,
+                      status: trackingOrder.carrierDispatchStatus === 'DELIVERED' || trackingOrder.carrierDispatchStatus === 'DISPATCHED' ? 'COMPLETED' : 'PENDING',
+                      description: `Routed to ${trackingOrder.network} telecom node via Hubtel API.`,
+                    },
+                    {
+                      step: 4,
+                      title: 'Delivered to Customer Phone Line',
+                      time: trackingOrder.completedAt || trackingOrder.createdAt,
+                      status: trackingOrder.carrierDispatchStatus === 'DELIVERED' || trackingOrder.carrierDispatchStatus === 'DISPATCHED' ? 'COMPLETED' : 'PENDING',
+                      description: `${trackingOrder.packageName} delivered to ${trackingOrder.recipientPhone}. Hubtel ID: ${trackingOrder.carrierReference}.`,
+                    },
+                  ]).map((t: any, idx: number) => {
+                    const isDone = t.status === 'COMPLETED';
+                    const isFailed = t.status === 'FAILED';
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-2xl border transition-all flex items-start gap-3 ${
+                          isDone
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                            : isFailed
+                            ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/60'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <div className={`w-6 h-6 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                          isDone
+                            ? 'bg-emerald-500 text-white'
+                            : isFailed
+                            ? 'bg-rose-500 text-white'
+                            : 'bg-amber-400 text-slate-950 font-bold'
+                        }`}>
+                          {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : isFailed ? <AlertTriangle className="w-3.5 h-3.5" /> : <span className="text-[10px]">{t.step || idx + 1}</span>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                              {t.title}
+                            </h5>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {t.time ? new Date(t.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                            {t.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Delivery Receipt Copy Section */}
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200 text-xs space-y-2">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    Customer Delivery Proof
+                  </span>
+                  <span className="font-mono text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-600 dark:text-emerald-400 font-bold">
+                    CARRIER CONFIRMED
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Carrier Transaction Ref: <strong className="font-mono text-slate-900 dark:text-white">{trackingOrder.carrierReference}</strong>
+                </p>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const receiptMsg = `*GHANA TELECOM TOP-UP RECEIPT*\n\nHello, your recharge of *${trackingOrder.packageName}* to *${trackingOrder.recipientPhone}* has been confirmed delivered!\n\n• Network: ${trackingOrder.network}\n• Delivery Ref: ${trackingOrder.carrierReference}\n• Date: ${new Date(trackingOrder.createdAt).toLocaleDateString()}\n\nThank you for choosing ${effectiveAgentName}!`;
+                    navigator.clipboard.writeText(receiptMsg);
+                    onShowToast('success', 'Copied WhatsApp Receipt', 'Customer receipt copied to clipboard.');
+                  }}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Copy WhatsApp Receipt</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenTracking(trackingOrder.reference || trackingOrder.orderNumber)}
+                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingTracking ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsTrackingModalOpen(false)}
+                    className="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-sm"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

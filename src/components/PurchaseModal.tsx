@@ -73,6 +73,8 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
   const [authStatus, setAuthStatus] = useState<string>('pay_offline');
   const [otpInput, setOtpInput] = useState('');
   const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
+  const [autoCloseCountdown, setAutoCloseCountdown] = useState<number>(3);
+  const [isAutoCloseActive, setIsAutoCloseActive] = useState<boolean>(true);
 
   // Currency & Amount calculation
   const amountGHS = serviceType === 'AIRTIME' ? airtimeAmountGHS : selectedPackage?.priceGHS || 0;
@@ -85,6 +87,24 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
       setCustomerEmail(currentUser.email);
     }
   }, [currentUser]);
+
+  // Auto-close countdown timer after successful payment
+  useEffect(() => {
+    let timer: any;
+    if (step === 'SUCCESS' && isAutoCloseActive) {
+      timer = setInterval(() => {
+        setAutoCloseCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            onClose();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [step, isAutoCloseActive, onClose]);
 
   // Countdown timer for MoMo PIN authorization step
   useEffect(() => {
@@ -105,10 +125,34 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
     return () => clearInterval(timer);
   }, [step, promptCountdown]);
 
+  // Helper to handle successful payment completion and auto-close
+  const handlePaymentApproved = (tx: any, carrierReceipt?: string) => {
+    setCompletedTx(tx);
+    setCarrierSms(
+      carrierReceipt ||
+        `[${network} Top-Up Alert] Dear Customer, your recharge of ${
+          serviceType === 'DATA' ? selectedPackage?.dataVolume || selectedPackage?.name : `GH₵${amountGHS.toFixed(2)} airtime`
+        } to ${recipientPhone} was successfully dispatched via Hubtel.`
+    );
+    setAutoCloseCountdown(1);
+    setIsAutoCloseActive(true);
+    setStep('SUCCESS');
+    onTransactionSuccess(tx);
+    onShowToast(
+      'success',
+      'PIN Approved & Dispatched!',
+      `${network} ${serviceType} credited to ${recipientPhone} via Hubtel. Closing window...`
+    );
+    // Automatically close the payment modal after successful PIN approval
+    setTimeout(() => {
+      onClose();
+    }, 1200);
+  };
+
   // Real-time listener: poll Paystack to check when customer enters 4-digit PIN on phone
   useEffect(() => {
     let pollInterval: any;
-    if (step === 'MOMO_AUTH_PROMPT' && activeReference) {
+    if (activeReference && (step === 'MOMO_AUTH_PROMPT' || step === 'PROCESSING')) {
       pollInterval = setInterval(async () => {
         try {
           const res = await fetch(`/api/paystack/status/${encodeURIComponent(activeReference)}`);
@@ -118,20 +162,7 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
               const data = await res.json();
               if (data && (data.status === 'success' || data.paymentStatus === 'success')) {
                 clearInterval(pollInterval);
-                setCompletedTx(data.transaction);
-                setCarrierSms(
-                  data.carrierSmsReceipt ||
-                    `[${network} Top-Up Alert] Dear Customer, your recharge of ${
-                      serviceType === 'DATA' ? selectedPackage?.dataVolume || selectedPackage?.name : `GH₵${amountGHS.toFixed(2)} airtime`
-                    } to ${recipientPhone} was successfully dispatched via Hubtel.`
-                );
-                setStep('SUCCESS');
-                onTransactionSuccess(data.transaction);
-                onShowToast(
-                  'success',
-                  'PIN Approved & Dispatched!',
-                  `${network} ${serviceType} credited to ${recipientPhone} via Hubtel in real time.`
-                );
+                handlePaymentApproved(data.transaction, data.carrierSmsReceipt);
               } else if (data && (data.status === 'failed' || data.paymentStatus === 'failed')) {
                 clearInterval(pollInterval);
                 const isFunds = data.isInsufficientFunds || (data.error || '').toLowerCase().includes('insufficient');
@@ -150,10 +181,35 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
         } catch {
           // Gracefully continue polling until countdown expires or customer confirms
         }
-      }, 3500);
+      }, 1500);
     }
     return () => clearInterval(pollInterval);
-  }, [step, activeReference, network, serviceType, selectedPackage, amountGHS, recipientPhone, onTransactionSuccess, onShowToast]);
+  }, [step, activeReference, network, serviceType, selectedPackage, amountGHS, recipientPhone, onTransactionSuccess, onShowToast, onClose]);
+
+  // Fast check on window focus / re-entry when customer returns from entering PIN on handset
+  useEffect(() => {
+    const handleRecheckOnFocus = async () => {
+      if (activeReference && (step === 'MOMO_AUTH_PROMPT' || step === 'PROCESSING')) {
+        try {
+          const res = await fetch(`/api/paystack/status/${encodeURIComponent(activeReference)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && (data.status === 'success' || data.paymentStatus === 'success')) {
+              handlePaymentApproved(data.transaction, data.carrierSmsReceipt);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener('focus', handleRecheckOnFocus);
+    window.addEventListener('visibilitychange', handleRecheckOnFocus);
+    return () => {
+      window.removeEventListener('focus', handleRecheckOnFocus);
+      window.removeEventListener('visibilitychange', handleRecheckOnFocus);
+    };
+  }, [activeReference, step, network, serviceType, selectedPackage, amountGHS, recipientPhone, onTransactionSuccess, onShowToast, onClose]);
 
   if (!isOpen) return null;
 
@@ -292,7 +348,8 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
   const verifyAndComplete = async (
     reference: string,
-    paystackReference?: string
+    paystackReference?: string,
+    retryCount = 0
   ) => {
     try {
       const verifyRes = await fetch('/api/paystack/verify', {
@@ -313,6 +370,12 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
       if (!verifyRes.ok) {
         if (verifyData.status === 'pending') {
+          // If customer just entered their PIN, retry twice after short pause to allow network settlement
+          if (retryCount < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            return verifyAndComplete(reference, paystackReference, retryCount + 1);
+          }
+
           setStep('MOMO_AUTH_PROMPT');
           onShowToast(
             'info',
@@ -331,20 +394,7 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
         return;
       }
 
-      setCompletedTx(verifyData.transaction);
-      setCarrierSms(
-        verifyData.carrierSmsReceipt ||
-          `[${network}] Recharge of ${
-            serviceType === 'DATA' ? selectedPackage?.dataVolume || selectedPackage?.name : `GH₵${amountGHS.toFixed(2)}`
-          } to ${recipientPhone} was successful. Hubtel ID: ${verifyData.transaction.hubtelTransactionId}.`
-      );
-      setStep('SUCCESS');
-      onTransactionSuccess(verifyData.transaction);
-      onShowToast(
-        'success',
-        'Top-Up Dispatched in Real Time!',
-        `${network} ${serviceType} credited to ${recipientPhone} via Hubtel.`
-      );
+      handlePaymentApproved(verifyData.transaction, verifyData.carrierSmsReceipt);
     } catch (err: any) {
       setErrorMessage(err.message || 'Payment verification failed.');
       setStep('FAILED');
@@ -764,6 +814,45 @@ export const PurchaseModal: React.FC<PurchaseModalProps> = ({
                   </span>.
                 </p>
               </div>
+
+              {/* Auto-Close Countdown Banner */}
+              {isAutoCloseActive ? (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-3.5 flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+                    <span className="font-semibold">
+                      Payment approved! Auto-closing in <strong className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{autoCloseCountdown}s</strong>...
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAutoCloseActive(false)}
+                      className="text-[11px] underline text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white cursor-pointer"
+                    >
+                      Keep Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[11px] shadow cursor-pointer transition-colors"
+                    >
+                      Close Now
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-100 dark:bg-slate-800/80 rounded-xl p-2.5 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                  <span>Auto-close paused. You can print receipt or close manually.</span>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    Close Window
+                  </button>
+                </div>
+              )}
 
               {/* Carrier SMS Delivery Notification Alert */}
               <div className="bg-emerald-50 dark:bg-emerald-950/40 p-3.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 text-xs">
